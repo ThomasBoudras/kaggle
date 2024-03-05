@@ -1,24 +1,25 @@
-#   Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+class AverageMeter(object):
+    """From https://github.com/pytorch/examples/blob/master/imagenet/main.py"""
+
+    def __init__(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def __repr__(self):
+        return f'{self.avg:.2e}'
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
 
 
 class dotdict(dict):
     def __getattr__(self, name):
-        try:
-            return self[name]
-        except KeyError:
-            raise AttributeError(name)
+        return self[name]
 
 
 def win_loss_draw(score):
@@ -29,14 +30,11 @@ def win_loss_draw(score):
     return 'draw'
 
 
-"""
-split one list to multiple lists
-"""
 split_group = lambda the_list, group_size: zip(*(iter(the_list), ) * group_size)
 
 import numpy as np
 import json
-from connect4_game import Connect4Game
+from connectX import Connect4Game
 
 
 def get_test_dataset():

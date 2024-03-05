@@ -1,26 +1,11 @@
-#   Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 import os
 import numpy as np
-import parl
 import torch
 import torch.optim as optim
 
 from tqdm import tqdm
 from utils import *
-from connect4_model import Connect4Model
+from connect4_model import Connect4Model as model_NN
 
 args = dotdict({
     'lr': 0.001,
@@ -31,7 +16,7 @@ args = dotdict({
 })
 
 
-class AlphaZero(parl.Algorithm):
+class AlphaZero():
     def __init__(self, model):
         self.model = model
 
@@ -43,8 +28,7 @@ class AlphaZero(parl.Algorithm):
 
         pi_loss = -torch.sum(target_pis * out_log_pi) / target_pis.size()[0]
 
-        v_loss = torch.sum(
-            (target_vs - out_v.view(-1))**2) / target_vs.size()[0]
+        v_loss = torch.sum((target_vs - out_v.view(-1))**2) / target_vs.size()[0]
 
         total_loss = pi_loss + v_loss
 
@@ -65,23 +49,12 @@ class AlphaZero(parl.Algorithm):
         return pi, v
 
 
-def create_agent(game, cuda=True):
-    cuda = cuda and torch.cuda.is_available()
-
-    model = Connect4Model(game, args)
-    if cuda:
-        model.cuda()
-
-    algorithm = AlphaZero(model)
-
-    alphazero_agent = AlphaZeroAgent(algorithm, game, cuda)
-    return alphazero_agent
-
-
-class AlphaZeroAgent(parl.Agent):
-    def __init__(self, algorithm, game, cuda):
-        super(AlphaZeroAgent, self).__init__(algorithm)
-        self.cuda = cuda
+class AlphaZeroAgent():
+    def __init__(self, game):
+        super(AlphaZeroAgent, self).__init__()
+        self.model = model_NN(game, args)
+        self.alg = AlphaZero(self.model)
+        self.cuda = torch.cuda.is_available()
         self.board_x, self.board_y = game.getBoardSize()
         self.action_size = game.getActionSize()
 
@@ -107,12 +80,9 @@ class AlphaZeroAgent(parl.Agent):
                 target_vs = torch.FloatTensor(np.array(vs).astype(np.float64))
 
                 if self.cuda:
-                    boards, target_pis, target_vs = boards.contiguous().cuda(
-                    ), target_pis.contiguous().cuda(), target_vs.contiguous(
-                    ).cuda()
+                    boards, target_pis, target_vs = boards.contiguous().cuda(), target_pis.contiguous().cuda(), target_vs.contiguous().cuda()
 
-                total_loss, pi_loss, v_loss = self.alg.learn(
-                    boards, target_pis, target_vs, optimizer)
+                total_loss, pi_loss, v_loss = self.alg.learn( boards, target_pis, target_vs, optimizer)
 
                 # record loss with tqdm
                 pbar.set_postfix(Loss_pi=pi_loss.item(), Loss_v=v_loss.item())
@@ -137,14 +107,21 @@ class AlphaZeroAgent(parl.Agent):
         return pi.data.cpu().numpy()[0], v.data.cpu().numpy()[0]
 
 
-def create_agent(game, cuda=True):
-    cuda = cuda and torch.cuda.is_available()
+    def save_checkpoint(self, folder='checkpoint', filename='checkpoint.pth.tar'):
+        filepath = os.path.join(folder, filename)
+        if not os.path.exists(folder):
+            print("Checkpoint Directory does not exist! Making directory {}".format(folder))
+            os.mkdir(folder)
+        else:
+            print("Checkpoint Directory exists! ")
+        torch.save({
+            'state_dict': self.model.state_dict(),
+        }, filepath)
 
-    model = Connect4Model(game, args)
-    if cuda:
-        model.cuda()
-
-    algorithm = AlphaZero(model)
-
-    alphazero_agent = AlphaZeroAgent(algorithm, game, cuda)
-    return alphazero_agent
+    def load_checkpoint(self, folder='checkpoint', filename='checkpoint.pth.tar'):
+        filepath = os.path.join(folder, filename)
+        if not os.path.exists(filepath):
+            raise ("No model in path {}".format(filepath))
+        map_location = None if self.cuda else 'cpu'
+        checkpoint = torch.load(filepath, map_location=map_location)
+        self.model.load_state_dict(checkpoint['state_dict'])
