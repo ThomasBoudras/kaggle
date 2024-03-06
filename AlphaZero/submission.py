@@ -298,7 +298,7 @@ class Connect4Game(object):
 
         """
         b = self._base_board.with_np_pieces(np_pieces=np.copy(board))
-        b.add_ste(action, player)
+        b.add_stone(action, player)
         return b.np_pieces, -player
 
     def getValidMoves(self, board, player):
