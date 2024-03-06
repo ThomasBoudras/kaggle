@@ -293,7 +293,7 @@ class Connect4Game(object):
             nextPlayer: player who plays in the next turn (should be -player)
 
         """
-        b = self._base_board.with_configuration(np_pieces=np.copy(board))
+        b = self._base_board.with_np_pieces(np_pieces=np.copy(board))
         b.add_ste(action, player)
         return b.np_pieces, -player
 
