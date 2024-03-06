@@ -34,7 +34,7 @@ split_group = lambda the_list, group_size: zip(*(iter(the_list), ) * group_size)
 
 import numpy as np
 import json
-from connectX import Connect4Game
+from connect4_game import Connect4Game
 
 
 def get_test_dataset():

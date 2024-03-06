@@ -177,43 +177,55 @@ class Board():
                  height=None,
                  width=None,
                  win_length=None,
-                 configuration=None):
+                 np_pieces=None):
+        "Set up initial board configuration."
         self.height = height or DEFAULT_HEIGHT
         self.width = width or DEFAULT_WIDTH
         self.win_length = win_length or DEFAULT_WIN_LENGTH
-        
-        if configuration is None:
-            self.configuration = np.zeros([self.height, self.width], dtype=np.int32)
-        else :
-            self.configuration = configuration 
-            assert self.configuration.shape == (self.height, self.width)
 
-    def with_configuration(self, configuration):
-        """update the board with the specific configuration"""
-        return Board(self.height, self.width, self.win_length, configuration)
+        if np_pieces is None:
+            self.np_pieces = np.zeros([self.height, self.width], dtype=np.int32)
+        else:
+            self.np_pieces = np_pieces
+            assert self.np_pieces.shape == (self.height, self.width)
 
-    def add_piece(self, column, player):
-        """update the board when player chooses to add a piece in the column"""
-        new_position, = np.where(self.configuration[:, column] == 0)
-        # print('add piece', column)
-        if len(new_position) == 0:
-            print(self.configuration, column, player)
-            raise ValueError( "Can't play column %s on the grid" % (column))
+    def add_stone(self, column, player):
+        "Create copy of board containing new stone."
+        available_idx, = np.where(self.np_pieces[:, column] == 0)
+        if len(available_idx) == 0:
+            raise ValueError(
+                "Can't play column %s on board %s" % (column, self))
 
-        self.configuration[new_position[-1]][column] = player
-    
+        self.np_pieces[available_idx[-1]][column] = player
+
     def get_valid_moves(self):
-        """Any zero value at the top row of the board is a valid move"""
-        return self.configuration[0] == 0
-    
-    def _is_straight_winner(self, player_pieces):
-        """check if player pieces has a horizontal win"""
-        run_lengths = [player_pieces[:, i:i + self.win_length].sum(axis=1)
-                       for i in range(len(player_pieces) - self.win_length  + 2)]
-        return max([x.max() for x in run_lengths]) >= self.win_length
+        "Any zero value in top row in a valid move"
+        return self.np_pieces[0] == 0
+
+    def get_win_state(self):
+        for player in [-1, 1]:
+            player_pieces = self.np_pieces == -player
+            # Check rows & columns for win
+            if (self._is_straight_winner(player_pieces)
+                    or self._is_straight_winner(player_pieces.transpose())
+                    or self._is_diagonal_winner(player_pieces)):
+                return WinState(True, -player)
+
+        # draw has very little value.
+        if not self.get_valid_moves().any():
+            return WinState(True, None)
+
+        # Game is not ended yet.
+        return WinState(False, None)
+
+    def with_np_pieces(self, np_pieces):
+        """Create copy of board with specified pieces."""
+        if np_pieces is None:
+            np_pieces = self.np_pieces
+        return Board(self.height, self.width, self.win_length, np_pieces)
 
     def _is_diagonal_winner(self, player_pieces):
-        """check if player pieces has a diagonal win"""
+        """Checks if player_pieces contains a diagonal win."""
         win_length = self.win_length
         for i in range(len(player_pieces) - win_length + 1):
             for j in range(len(player_pieces[0]) - win_length + 1):
@@ -223,24 +235,17 @@ class Board():
                 if all(player_pieces[i + x][j - x] for x in range(win_length)):
                     return True
         return False
-    
-    def get_winner(self):
-        for player in [-1,1]:
-            player_pieces = self.configuration == -player
-            # print('get winner, player pieces and player:', player, player_pieces)
 
-            if (self._is_straight_winner(player_pieces) 
-                or self._is_straight_winner(player_pieces.transpose())
-                or self._is_diagonal_winner(player_pieces)):
-                return WinState(True, -player)
-            
-            if not self.get_valid_moves().any():
-                return WinState(True, None) #there is no more move possible
-            
-        return WinState(False, None)
-    
+    def _is_straight_winner(self, player_pieces):
+        """Checks if player_pieces contains a vertical or horizontal win."""
+        run_lengths = [
+            player_pieces[:, i:i + self.win_length].sum(axis=1)
+            for i in range(len(player_pieces) - self.win_length + 2)
+        ]
+        return max([x.max() for x in run_lengths]) >= self.win_length
+
     def __str__(self):
-        return str(self.configuration)
+        return str(self.np_pieces)
 
 
 class Connect4Game(object):
@@ -292,8 +297,8 @@ class Connect4Game(object):
             nextPlayer: player who plays in the next turn (should be -player)
 
         """
-        b = self._base_board.with_np_pieces(np_pieces=np.copy(board))
-        b.add_stone(action, player)
+        b = self._base_board.with_configuration(np_pieces=np.copy(board))
+        b.add_ste(action, player)
         return b.np_pieces, -player
 
     def getValidMoves(self, board, player):
