@@ -1,8 +1,3 @@
-# Third party code
-#
-# The following code are copied or modified from:
-# https://github.com/suragnair/alpha-zero-general
-
 import os
 os.environ['OMP_NUM_THREADS'] = "1"
 
@@ -48,10 +43,9 @@ class MCTS():
             probs: a policy vector where the probability of the ith action is
                    proportional to Nsa[(s,a)]**(1./temp)
         """
-        dir_noise = self.dirichlet_noise
         start_time = time.time()
         while time.time() - start_time < timelimit:
-            self.search(canonicalBoard, dirichlet_noise=dir_noise)
+            self.search(canonicalBoard)
 
         s = self.game.stringRepresentation(canonicalBoard)
         counts = [
@@ -105,8 +99,6 @@ class MCTS():
 
             valids = self.game.getValidMoves(canonicalBoard, 1)
             self.Ps[s] = self.Ps[s] * valids  # masking invalid moves
-            if dirichlet_noise:
-                self.applyDirNoise(s, valids)
             sum_Ps_s = np.sum(self.Ps[s])
             if sum_Ps_s > 0:
                 self.Ps[s] /= sum_Ps_s  # renormalize
@@ -124,10 +116,6 @@ class MCTS():
             return -v
 
         valids = self.Vs[s]
-        if dirichlet_noise:
-            self.applyDirNoise(s, valids)
-            sum_Ps_s = np.sum(self.Ps[s])
-            self.Ps[s] /= sum_Ps_s  # renormalize
         cur_best = -float('inf')
         best_act = -1
 
@@ -164,16 +152,6 @@ class MCTS():
         self.Ns[s] += 1
         return -v
 
-    def applyDirNoise(self, s, valids):
-        dir_values = np.random.dirichlet(
-            [self.args.dirichletAlpha] * np.count_nonzero(valids))
-        dir_idx = 0
-        for idx in range(len(self.Ps[s])):
-            if self.Ps[s][idx]:
-                self.Ps[s][idx] = (0.75 * self.Ps[s][idx]) + (
-                    0.25 * dir_values[dir_idx])
-                dir_idx += 1
-
 
 # ===== connect4_game.py ======
 import numpy as np
@@ -195,55 +173,43 @@ class Board():
                  height=None,
                  width=None,
                  win_length=None,
-                 np_pieces=None):
-        "Set up initial board configuration."
+                 configuration=None):
         self.height = height or DEFAULT_HEIGHT
         self.width = width or DEFAULT_WIDTH
         self.win_length = win_length or DEFAULT_WIN_LENGTH
+        
+        if configuration is None:
+            self.configuration = np.zeros([self.height, self.width], dtype=np.int32)
+        else :
+            self.configuration = configuration 
+            assert self.configuration.shape == (self.height, self.width)
 
-        if np_pieces is None:
-            self.np_pieces = np.zeros([self.height, self.width], dtype=np.int32)
-        else:
-            self.np_pieces = np_pieces
-            assert self.np_pieces.shape == (self.height, self.width)
+    def with_configuration(self, configuration):
+        """update the board with the specific configuration"""
+        return Board(self.height, self.width, self.win_length, configuration)
 
-    def add_stone(self, column, player):
-        "Create copy of board containing new stone."
-        available_idx, = np.where(self.np_pieces[:, column] == 0)
-        if len(available_idx) == 0:
-            raise ValueError(
-                "Can't play column %s on board %s" % (column, self))
+    def add_piece(self, column, player):
+        """update the board when player chooses to add a piece in the column"""
+        new_position, = np.where(self.configuration[:, column] == 0)
+        # print('add piece', column)
+        if len(new_position) == 0:
+            print(self.configuration, column, player)
+            raise ValueError( "Can't play column %s on the grid" % (column))
 
-        self.np_pieces[available_idx[-1]][column] = player
-
+        self.configuration[new_position[-1]][column] = player
+    
     def get_valid_moves(self):
-        "Any zero value in top row in a valid move"
-        return self.np_pieces[0] == 0
-
-    def get_win_state(self):
-        for player in [-1, 1]:
-            player_pieces = self.np_pieces == -player
-            # Check rows & columns for win
-            if (self._is_straight_winner(player_pieces)
-                    or self._is_straight_winner(player_pieces.transpose())
-                    or self._is_diagonal_winner(player_pieces)):
-                return WinState(True, -player)
-
-        # draw has very little value.
-        if not self.get_valid_moves().any():
-            return WinState(True, None)
-
-        # Game is not ended yet.
-        return WinState(False, None)
-
-    def with_np_pieces(self, np_pieces):
-        """Create copy of board with specified pieces."""
-        if np_pieces is None:
-            np_pieces = self.np_pieces
-        return Board(self.height, self.width, self.win_length, np_pieces)
+        """Any zero value at the top row of the board is a valid move"""
+        return self.configuration[0] == 0
+    
+    def _is_straight_winner(self, player_pieces):
+        """check if player pieces has a horizontal win"""
+        run_lengths = [player_pieces[:, i:i + self.win_length].sum(axis=1)
+                       for i in range(len(player_pieces) - self.win_length  + 2)]
+        return max([x.max() for x in run_lengths]) >= self.win_length
 
     def _is_diagonal_winner(self, player_pieces):
-        """Checks if player_pieces contains a diagonal win."""
+        """check if player pieces has a diagonal win"""
         win_length = self.win_length
         for i in range(len(player_pieces) - win_length + 1):
             for j in range(len(player_pieces[0]) - win_length + 1):
@@ -253,17 +219,24 @@ class Board():
                 if all(player_pieces[i + x][j - x] for x in range(win_length)):
                     return True
         return False
+    
+    def get_winner(self):
+        for player in [-1,1]:
+            player_pieces = self.configuration == -player
+            # print('get winner, player pieces and player:', player, player_pieces)
 
-    def _is_straight_winner(self, player_pieces):
-        """Checks if player_pieces contains a vertical or horizontal win."""
-        run_lengths = [
-            player_pieces[:, i:i + self.win_length].sum(axis=1)
-            for i in range(len(player_pieces) - self.win_length + 2)
-        ]
-        return max([x.max() for x in run_lengths]) >= self.win_length
-
+            if (self._is_straight_winner(player_pieces) 
+                or self._is_straight_winner(player_pieces.transpose())
+                or self._is_diagonal_winner(player_pieces)):
+                return WinState(True, -player)
+            
+            if not self.get_valid_moves().any():
+                return WinState(True, None) #there is no more move possible
+            
+        return WinState(False, None)
+    
     def __str__(self):
-        return str(self.np_pieces)
+        return str(self.configuration)
 
 
 class Connect4Game(object):
@@ -527,7 +500,7 @@ class SimpleAgent():
     def load_checkpoint(self, buffer):
         map_location = None if self.cuda else 'cpu'
         checkpoint = torch.load(buffer, map_location=map_location)
-        self.model.load_state_dict(checkpoint)
+        self.model.load_state_dict(checkpoint['state_dict'])
 
 
 # ===== predict function ======

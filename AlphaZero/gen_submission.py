@@ -17,7 +17,7 @@ import base64
 import inspect
 import os
 
-assert len(sys.argv) == 2, "please specify model path."
+assert len(sys.argv) == 2, "please specify model path. "
 model_path = sys.argv[1]
 
 with open(model_path, 'rb') as f:
