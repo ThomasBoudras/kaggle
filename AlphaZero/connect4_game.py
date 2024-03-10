@@ -1,3 +1,5 @@
+#These codes were inspired and modified by the following two github sites: "https://github.com/PaddlePaddle/PARL/tree/develop" and "https://github.com/suragnair/alpha-zero-general/tree/master".
+
 import numpy as np
 from collections import namedtuple
 
