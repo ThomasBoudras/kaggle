@@ -36,11 +36,11 @@ split_group = lambda the_list, group_size: zip(*(iter(the_list), ) * group_size)
 
 import numpy as np
 import json
-from connect4_game import Connect4Game
+from simulation_game import Simulation_Connect4
 
 
 def get_test_dataset():
-    game = Connect4Game()
+    game = Simulation_Connect4()
     test_dataset = []
     with open("refmoves1k_kaggle") as f:
         for line in f:
