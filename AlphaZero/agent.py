@@ -8,7 +8,12 @@ import torch.optim as optim
 
 from tqdm import tqdm
 from utils import *
-from model_conv import model_NN
+from training import model_NN
+
+class dotdict(dict):
+    def __getattr__(self, name):
+        return self[name]
+
 
 args = dotdict({
     'lr': 0.001,

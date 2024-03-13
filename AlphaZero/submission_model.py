@@ -398,8 +398,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-
-#class model_NN(parl.Model): # Kaggle doesn't support parl package
 class model_NN(nn.Module):
     def __init__(self, game, args):
         # game params
