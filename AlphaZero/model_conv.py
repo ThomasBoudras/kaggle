@@ -42,15 +42,10 @@ class model_NN(nn.Module):
         Args:
             s(torch.Tensor): batch_size x board_x x board_y
         """
-        # batch_size x 1 x board_x x board_y
         s = s.view(-1, 1, self.board_x, self.board_y)
-        # batch_size x num_channels x board_x x board_y
         s = F.relu(self.bn1(self.conv1(s)))
-        # batch_size x num_channels x board_x x board_y
         s = F.relu(self.bn2(self.conv2(s)))
-        # batch_size x num_channels x (board_x-2) x (board_y-2)
         s = F.relu(self.bn3(self.conv3(s)))
-        # batch_size x num_channels x (board_x-4) x (board_y-4)
         s = F.relu(self.bn4(self.conv4(s)))
         s = s.view(
             -1,
@@ -59,13 +54,13 @@ class model_NN(nn.Module):
         s = F.dropout(
             F.relu(self.fc_bn1(self.fc1(s))),
             p=self.args.dropout,
-            training=self.training)  # batch_size x 128
+            training=self.training) 
         s = F.dropout(
             F.relu(self.fc_bn2(self.fc2(s))),
             p=self.args.dropout,
-            training=self.training)  # batch_size x 64
+            training=self.training)  
 
-        pi = self.fc3(s)  # batch_size x action_size
-        v = self.fc4(s)  # batch_size x 1
+        pi = self.fc3(s)  
+        v = self.fc4(s) 
 
         return F.log_softmax(pi, dim=1), torch.tanh(v)

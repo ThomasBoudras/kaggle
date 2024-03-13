@@ -27,23 +27,18 @@ args = dotdict({
 
 
 def main():
-    log.info('Loading %s...', Simulation_Connect4.__name__)
     game = Simulation_Connect4()
 
-    log.info('Loading %s...', agent.__name__)
+    log.info('Initialisation')
     model = agent(game)
 
     if args.load_model:
-        log.info('Loading checkpoint {}...'.format(args.load_folder_file))
         model.load_checkpoint(args.load_folder_file[0], args.load_folder_file[1])
-    else:
-        log.warning('Not loading a checkpoint!')
     
-    log.info('Loading training...')
+    log.info('Training')
     c = Train(game, model, args)
     
     if args.load_model:
-        log.info('Loading training example')
         c.loadTrainExamples()
 
     c.learn()
